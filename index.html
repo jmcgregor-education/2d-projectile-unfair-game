@@ -41,7 +41,6 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .keybtn kbd{font-family:var(--body);background:var(--gold);color:#1a1300;border-radius:4px;padding:1px 8px;font-weight:800;margin-left:6px}
 .keybtn.capturing{border-color:var(--gold);color:var(--gold);animation:pulse 1s infinite}
 .hint{color:var(--muted);font-size:.9rem;margin-top:14px;line-height:1.45}
-#startBtn{margin-top:26px;font-size:1.4rem;padding:.75em 2.2em}
 
 /* ---------- game ---------- */
 #game{padding:14px 18px 24px;max-width:1400px;margin:0 auto}
@@ -142,6 +141,20 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
 .stand.win{border-color:var(--gold);background:linear-gradient(90deg,#5a4300,#122157);box-shadow:0 0 30px rgba(247,201,72,.5);animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
 #winnerName{font-family:var(--display);font-size:clamp(2.6rem,8vw,5.5rem);margin:6px 0 2px}
 #confirmEnd .subpanel{position:relative}
+
+/* ---------- study mode ---------- */
+#study{padding:14px 18px 30px;max-width:1000px;margin:0 auto}
+.stbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.chip{background:var(--navy2);border:2px solid var(--line);color:var(--cream);border-radius:20px;padding:.45em 1em;font-weight:700;font-size:.95rem}
+.chip.on{background:var(--gold);color:#1a1300;border-color:var(--gold)}
+.chip.toggle.on{background:#2a4bb3;color:#fff;border-color:#6d8cff}
+#stProg{color:var(--muted);font-size:1.05rem;margin-left:auto}
+.stpanel{max-height:none;width:100%}
+#stDone{text-align:center;padding:30px 10px}
+#stDone .title{font-size:clamp(2.6rem,7vw,4.5rem)}
+#stScore{font-family:var(--display);font-size:clamp(3rem,9vw,6rem);color:#fff;margin:10px 0 24px}
+.setupbtns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.setupbtns .btn{font-size:1.3rem;padding:.75em 2em}
 @keyframes flash{50%{opacity:.35}}
 @keyframes pulse{50%{box-shadow:0 0 0 4px rgba(247,201,72,.3)}}
 @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
@@ -172,7 +185,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
     <div id="teamList"></div>
     <p class="hint">Each team's buzz key is used on the Slot 4 showdown questions. Click a key to change it, then press the key a team's buzzer sends (or any keyboard key). If you're using a lockout box instead, ignore the keys and click the team's button on screen when they buzz.</p>
   </div>
-  <button class="btn" id="startBtn">Start game</button>
+  <div class="setupbtns"><button class="btn ghost" id="studyBtn">Study on my own</button><button class="btn" id="startBtn">Start game</button></div>
 </section>
 
 <!-- ============ GAME ============ -->
@@ -187,6 +200,39 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-o
   <div id="board"></div>
   <div id="scores"></div>
   <div class="bottombar"><button class="btn danger" id="endEarly">End game early &amp; reveal winner</button></div>
+</section>
+
+
+<!-- ============ STUDY MODE ============ -->
+<section id="study" class="hidden">
+  <div class="topbar">
+    <h1 class="title">Study mode</h1>
+    <span style="flex:1"></span>
+    <button class="iconbtn" id="stExit">Exit study mode</button>
+  </div>
+  <div class="stbar" id="stCats"></div>
+  <div class="stbar"><button class="chip toggle" id="stShuffle">Shuffle order</button><span id="stProg"></span></div>
+  <div id="stMain" class="qpanel stpanel">
+    <div class="qhead"><span id="stCat" style="font-family:var(--display);font-size:1.6rem;color:var(--gold)"></span><span id="stTag" class="tag"></span></div>
+    <div id="stNote" class="note"></div>
+    <div id="stText" class="qtext"></div>
+    <div id="stChoices" class="choices"></div>
+    <div id="stOpen" class="answerrow">
+      <label for="stInput">Your answer:</label>
+      <input id="stInput" inputmode="decimal" autocomplete="off" spellcheck="false" style="font-size:1.8rem;width:7em;padding:.25em .4em;border-radius:10px;border:3px solid var(--gold);background:var(--navy);color:#fff;font-weight:700">
+      <span id="stUnits" style="font-size:1.6rem;font-weight:700;color:var(--gold)"></span>
+      <button class="btn" id="stCheck">Check answer</button>
+      <button class="btn ghost" id="stGiveUp">Show solution</button>
+    </div>
+    <div id="stFeedback" class="feedback"></div>
+    <div id="stReveal" class="reveal hidden"></div>
+    <div class="controls"><button class="btn ghost" id="stPrev">Previous</button><button class="btn" id="stNext">Next question</button></div>
+  </div>
+  <div id="stDone" class="hidden">
+    <div class="title">Set complete</div>
+    <div id="stScore"></div>
+    <div class="setupbtns"><button class="btn ghost" id="stRestart">Start over</button><button class="btn" id="stRetry">Retry the ones I missed</button></div>
+  </div>
 </section>
 
 <!-- ============ QUESTION ============ -->
@@ -673,6 +719,106 @@ document.addEventListener('keydown', e=>{
   const k=normKey(e.key); const t=S.teams.findIndex(tm=>tm.key===k);
   if(t>=0){ e.preventDefault(); buzz(t); }
 });
+
+/* ---------- study mode ---------- */
+const ST = { cat:'all', shuffle:false, list:[], i:0, res:[] };
+const SLOT_LABEL = ['Slot 1: conceptual','Slot 2: conceptual','Slot 3: calculation','Slot 4: showdown'];
+
+function stBuild(items){
+  if(!items){
+    items=[];
+    DATA.categories.forEach((c,ci)=>{ if(ST.cat!=='all' && ST.cat!==ci) return;
+      c.pools.forEach((pool,si)=>pool.forEach(q=>items.push({ci,si,raw:q}))); });
+  }
+  if(ST.shuffle) items=shuffle(items);
+  ST.list=items.map(it=>({...it, q:prepQ(it.raw)})); ST.i=0; ST.res=[];
+  $('#stDone').classList.add('hidden'); $('#stMain').classList.remove('hidden');
+  stRenderCats(); stRender();
+}
+function stRenderCats(){
+  const box=$('#stCats'); box.innerHTML='';
+  const mk=(label,val)=>{ const b=document.createElement('button'); b.className='chip'+(ST.cat===val?' on':''); b.textContent=label;
+    b.onclick=()=>{ ST.cat=val; stBuild(); }; box.appendChild(b); };
+  mk('All categories','all'); DATA.categories.forEach((c,ci)=>mk(c.title,ci));
+  $('#stShuffle').classList.toggle('on',ST.shuffle);
+}
+function stRender(){
+  const it=ST.list[ST.i], q=it.q, r=ST.res[ST.i];
+  const right=ST.res.filter(x=>x&&x.ok).length, tried=ST.res.filter(Boolean).length;
+  $('#stProg').textContent=`Question ${ST.i+1} of ${ST.list.length}. ${right} of ${tried} right so far.`;
+  $('#stCat').textContent=DATA.categories[it.ci].title;
+  $('#stTag').className='tag'+(it.si===3?' show':it.si===2?' calc':''); $('#stTag').textContent=SLOT_LABEL[it.si];
+  $('#stNote').textContent = it.si>=2 ? 'Use g = 9.8 m/s².'+(it.si===3?' Answers within ±5% count.':'') : '';
+  $('#stText').textContent=q.q;
+  $('#stFeedback').innerHTML=''; const rv=$('#stReveal'); rv.classList.add('hidden'); rv.innerHTML='';
+  const box=$('#stChoices'); box.innerHTML='';
+  if(q.type==='mc'){
+    $('#stOpen').classList.add('hidden'); box.classList.remove('hidden');
+    q.options.forEach((o,i)=>{ const b=document.createElement('button'); b.className='choice';
+      b.innerHTML=`<span class="lt">${'ABCD'[i]}</span><span>${esc(o)}</span>`;
+      b.onclick=()=>stChoose(i); box.appendChild(b); });
+    if(r) stShowMC(r);
+  } else {
+    box.classList.add('hidden'); $('#stUnits').textContent=q.units;
+    const inp=$('#stInput'); inp.value='';
+    if(r){ $('#stOpen').classList.add('hidden'); stShowOpen(r); }
+    else { $('#stOpen').classList.remove('hidden'); setTimeout(()=>inp.focus(),30); }
+  }
+  $('#stPrev').disabled = ST.i===0;
+  $('#stNext').textContent = ST.i===ST.list.length-1 ? 'Finish' : 'Next question';
+}
+function stChoose(i){
+  if(ST.res[ST.i]) return;
+  const q=ST.list[ST.i].q, r={ok:i===q.correct, pick:i};
+  ST.res[ST.i]=r; r.ok?sfx.correct():sfx.wrong(); stShowMC(r); stUpdateProg();
+}
+function stShowMC(r){
+  const q=ST.list[ST.i].q, btns=[...$('#stChoices').children];
+  btns.forEach(b=>b.disabled=true);
+  btns[q.correct].classList.add(r.ok?'correct':'reveal');
+  if(!r.ok) btns[r.pick].classList.add('wrong');
+  $('#stFeedback').innerHTML = r.ok ? '<span class="ok">✓ Correct!</span>' : `<span class="bad">✗ Not quite.</span> The answer is <b>${esc(q.options[q.correct])}</b>.`;
+}
+function stCheck(giveUp){
+  if(ST.res[ST.i]) return;
+  const q=ST.list[ST.i].q, inp=$('#stInput');
+  let r;
+  if(giveUp) r={ok:false, gaveUp:true};
+  else {
+    const raw=inp.value.replace(/,/g,'').replace(/[^\d.eE+\-−]/g,'').replace('−','-'); const v=parseFloat(raw);
+    if(!isFinite(v)){ inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); return; }
+    r={ok:Math.abs(v-q.answer)<=TOLERANCE*Math.abs(q.answer), val:raw};
+  }
+  ST.res[ST.i]=r; r.ok?sfx.correct():(giveUp?null:sfx.wrong());
+  $('#stOpen').classList.add('hidden'); stShowOpen(r); stUpdateProg();
+}
+function stShowOpen(r){
+  const q=ST.list[ST.i].q;
+  $('#stFeedback').innerHTML = r.gaveUp ? 'Here’s how it works:' :
+    r.ok ? `<span class="ok">✓ ${esc(r.val+unitStr(q.units))} is correct!</span>` : `<span class="bad">✗ ${esc(r.val+unitStr(q.units))} isn’t it.</span> Check the steps:`;
+  const rv=$('#stReveal'); rv.classList.remove('hidden');
+  rv.innerHTML=`<div class="ansline">Answer: ${esc(q.display)}${esc(unitStr(q.units))}</div><ol class="sol">${q.solution.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`;
+}
+function stUpdateProg(){ const right=ST.res.filter(x=>x&&x.ok).length, tried=ST.res.filter(Boolean).length;
+  $('#stProg').textContent=`Question ${ST.i+1} of ${ST.list.length}. ${right} of ${tried} right so far.`; }
+function stFinish(){
+  const right=ST.res.filter(x=>x&&x.ok).length;
+  const missed=ST.list.filter((_,i)=>!(ST.res[i]&&ST.res[i].ok));
+  $('#stMain').classList.add('hidden'); $('#stDone').classList.remove('hidden');
+  $('#stScore').textContent=`${right} / ${ST.list.length}`;
+  const rb=$('#stRetry'); rb.classList.toggle('hidden', missed.length===0);
+  rb.textContent=`Retry the ${missed.length} I missed`;
+  rb.onclick=()=>stBuild(missed.map(m=>({ci:m.ci,si:m.si,raw:m.raw})));
+}
+$('#studyBtn').onclick=()=>{ ac(); $('#setup').classList.add('hidden'); $('#study').classList.remove('hidden'); stBuild(); };
+$('#stExit').onclick=()=>{ $('#study').classList.add('hidden'); $('#setup').classList.remove('hidden'); };
+$('#stShuffle').onclick=()=>{ ST.shuffle=!ST.shuffle; stBuild(); };
+$('#stPrev').onclick=()=>{ if(ST.i>0){ ST.i--; stRender(); } };
+$('#stNext').onclick=()=>{ if(ST.i<ST.list.length-1){ ST.i++; stRender(); window.scrollTo(0,0); } else stFinish(); };
+$('#stCheck').onclick=()=>stCheck(false);
+$('#stGiveUp').onclick=()=>stCheck(true);
+$('#stInput').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); stCheck(false); } });
+$('#stRestart').onclick=()=>stBuild();
 
 renderSetup();
 </script>
