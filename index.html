@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Unfair Game: 2D Projectiles</title>
+<style>
+:root{
+  --navy:#0a1433; --navy2:#122157; --navy3:#1b2f74; --line:#2d4596;
+  --gold:#f7c948; --gold2:#d9a521; --cream:#fff6dc; --muted:#a9b6e0;
+  --green:#3ddc97; --red:#ff5d5d;
+  --display: Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Black", sans-serif;
+  --body: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 50% -10%, #20358a 0%, var(--navy) 55%, #050b20 100%) fixed;color:var(--cream);font-family:var(--body);min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.hidden{display:none !important}
+.title{font-family:var(--display);color:var(--gold);letter-spacing:.02em;text-shadow:0 3px 0 #8a5a00,0 6px 18px rgba(0,0,0,.6);margin:0;line-height:1}
+.btn{background:linear-gradient(#ffd965,var(--gold2));color:#1a1300;border:0;border-radius:10px;padding:.7em 1.3em;font-weight:800;font-size:1.05rem;box-shadow:0 4px 0 #7a5200}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 #7a5200}
+.btn.ghost{background:transparent;color:var(--cream);border:2px solid var(--line);box-shadow:none}
+.btn.danger{background:linear-gradient(#ff7b7b,#d63c3c);color:#fff;box-shadow:0 4px 0 #7a1515}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* ---------- setup ---------- */
+#setup{max-width:760px;margin:0 auto;padding:40px 20px 60px;text-align:center}
+#setup .title{font-size:clamp(3rem,9vw,6rem)}
+.arc{display:block;margin:6px auto 0;width:min(520px,90%);height:auto}
+.sub{color:var(--muted);font-size:1.15rem;margin:10px 0 30px}
+.panel{background:rgba(18,33,87,.85);border:2px solid var(--line);border-radius:16px;padding:22px;text-align:left}
+.countrow{display:flex;align-items:center;gap:14px;justify-content:center;margin-bottom:18px;font-size:1.1rem}
+.countrow button{width:42px;height:42px;border-radius:50%;font-size:1.4rem;font-weight:900;padding:0}
+#teamCount{font-family:var(--display);font-size:2rem;color:var(--gold);min-width:2ch;text-align:center}
+.trow{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:center;margin:8px 0}
+.swatch{width:22px;height:22px;border-radius:50%}
+.trow input{background:var(--navy);border:2px solid var(--line);color:var(--cream);border-radius:8px;padding:.55em .7em;font-size:1rem;width:100%}
+.keybtn{background:var(--navy);border:2px solid var(--line);color:var(--muted);border-radius:8px;padding:.45em .7em;font-size:.9rem;white-space:nowrap}
+.keybtn kbd{font-family:var(--body);background:var(--gold);color:#1a1300;border-radius:4px;padding:1px 8px;font-weight:800;margin-left:6px}
+.keybtn.capturing{border-color:var(--gold);color:var(--gold);animation:pulse 1s infinite}
+.hint{color:var(--muted);font-size:.9rem;margin-top:14px;line-height:1.45}
+#startBtn{margin-top:26px;font-size:1.4rem;padding:.75em 2.2em}
+
+/* ---------- game ---------- */
+#game{padding:14px 18px 24px;max-width:1400px;margin:0 auto}
+.topbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.topbar .title{font-size:2.1rem}
+#turnInd{flex:1;font-size:1.2rem;min-width:220px}
+#turnInd b{font-size:1.35rem}
+#progress{color:var(--muted)}
+.iconbtn{background:transparent;border:2px solid var(--line);color:var(--cream);border-radius:10px;padding:.45em .8em;font-size:1rem}
+#banner{background:linear-gradient(90deg,#5a1a8a,#a8326e,#5a1a8a);border:2px solid var(--gold);border-radius:12px;padding:10px 16px;text-align:center;font-family:var(--display);font-size:1.6rem;letter-spacing:.03em;margin-bottom:12px;color:#fff}
+#board{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:8px}
+.cat{background:var(--navy3);border:2px solid var(--line);border-radius:10px;min-height:76px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;font-family:var(--display);font-size:clamp(1rem,1.6vw,1.45rem);color:#fff;letter-spacing:.02em;line-height:1.1}
+.cell{background:linear-gradient(#1d3486,#132560);border:2px solid var(--line);border-radius:10px;min-height:clamp(70px,13vh,120px);font-family:var(--display);font-size:clamp(2.4rem,5vw,4rem);color:var(--gold);text-shadow:0 3px 0 #6b4500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .12s}
+.cell:hover:not(.done){transform:scale(1.03);border-color:var(--gold)}
+.cell.s4{background:linear-gradient(#5b2a00,#2e1700);border-color:#a06a10}
+.cell .tag4{font-family:var(--body);font-size:.75rem;font-weight:800;color:#ffd98a;text-shadow:none;letter-spacing:.06em}
+.cell.done{background:rgba(10,20,51,.6);border-color:#1c2a5c;cursor:default;font-size:1.6rem;text-shadow:none}
+.cell.done .dv.pos{color:var(--green)} .cell.done .dv.neg{color:var(--red)}
+.cell.done .dt{font-family:var(--body);font-size:.8rem;font-weight:700;padding:1px 8px;border-radius:20px;color:#0a1433}
+#scores{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.score{flex:1;min-width:130px;background:var(--navy2);border:3px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center;position:relative}
+.score .nm{font-weight:800;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score .pt{font-family:var(--display);font-size:2.4rem;line-height:1.1}
+.score.turn{box-shadow:0 0 0 3px var(--gold),0 0 24px rgba(247,201,72,.45)}
+.score.turn::before{content:"▼ UP";position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold);color:#1a1300;font-size:.7rem;font-weight:900;padding:1px 8px;border-radius:10px}
+.bottombar{display:flex;justify-content:flex-end;margin-top:14px}
+
+/* ---------- overlays ---------- */
+.overlay{position:fixed;inset:0;background:rgba(3,7,20,.88);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.qpanel{background:linear-gradient(#142463,#0b1640);border:3px solid var(--gold2);border-radius:20px;width:min(1100px,100%);max-height:96vh;overflow:auto;padding:22px 28px 24px;position:relative}
+.qhead{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+#qCat{font-family:var(--display);font-size:1.6rem;color:var(--gold)}
+.tag{background:var(--navy3);border:2px solid var(--line);border-radius:20px;padding:4px 12px;font-weight:700;font-size:.95rem}
+.tag.calc{border-color:#4aa3ff;color:#bfe0ff}
+.tag.show{border-color:#ff9a3d;color:#ffd2a6;background:#3a1d00}
+.qstatus{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px}
+#qWho{font-size:1.35rem;font-weight:700}
+.timer{font-family:var(--display);font-size:3.6rem;min-width:2.2em;text-align:center;color:var(--cream);line-height:1;padding:6px 14px;border-radius:14px;background:rgba(0,0,0,.25)}
+.timer.reading{color:#9fc3ff;font-size:2.6rem}
+.timer.danger{color:var(--red);animation:flash .5s infinite}
+.timer.grace{color:#fff;background:var(--red);animation:flash .35s infinite;font-size:2.6rem}
+.timer.open{color:#1a1300;background:var(--gold);font-size:2.4rem}
+.timer.idle{color:var(--muted);font-size:2.2rem}
+.note{color:var(--muted);margin-top:6px;font-size:1rem}
+.qtext{font-size:clamp(1.4rem,2.6vw,2.2rem);line-height:1.35;margin:18px 0 20px;font-weight:600}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice{display:flex;align-items:center;gap:14px;text-align:left;background:var(--navy3);border:3px solid var(--line);color:var(--cream);border-radius:14px;padding:14px 16px;font-size:clamp(1.05rem,1.8vw,1.45rem);font-weight:600}
+.choice .lt{font-family:var(--display);color:var(--gold);font-size:1.6em;min-width:1ch}
+.choice:hover:not(:disabled){border-color:var(--gold)}
+.choice:disabled{cursor:default}
+.choice.wrong{background:#4a1220;border-color:var(--red);opacity:.75;text-decoration:line-through}
+.choice.correct{background:#0e4a35;border-color:var(--green);box-shadow:0 0 22px rgba(61,220,151,.5)}
+.choice.reveal{background:#0e4a35;border-color:var(--green)}
+.feedback{min-height:1.6em;margin-top:16px;font-size:1.3rem;font-weight:700}
+.feedback .ok{color:var(--green)} .feedback .bad{color:var(--red)}
+.wronglog{color:#ffb0b0;font-size:1.05rem;margin-top:6px}
+.buzzteams{display:flex;flex-wrap:wrap;gap:10px}
+.bchip{border:3px solid;border-radius:12px;background:var(--navy);color:var(--cream);padding:10px 16px;font-size:1.1rem;font-weight:800;display:flex;gap:10px;align-items:center}
+.bchip kbd{font-family:var(--body);background:rgba(255,255,255,.15);border-radius:4px;padding:0 7px;font-size:.85rem}
+.bchip.locked{opacity:.3;text-decoration:line-through}
+.bchip.lit{animation:buzzlit .6s 2}
+.bchip:disabled{cursor:default}
+.answerrow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:16px;background:rgba(0,0,0,.25);border-radius:14px;padding:14px}
+.answerrow label{font-weight:800;font-size:1.2rem}
+#ansInput{font-size:1.8rem;width:7em;padding:.25em .4em;border-radius:10px;border:3px solid var(--gold);background:var(--navy);color:#fff;font-weight:700}
+#ansUnits{font-size:1.6rem;font-weight:700;color:var(--gold)}
+.shake{animation:shake .35s}
+.controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;margin-top:20px}
+.reveal{margin-top:16px;background:rgba(0,0,0,.28);border:2px solid var(--line);border-radius:14px;padding:16px 20px}
+.ptsbig{font-family:var(--display);font-size:clamp(4rem,10vw,7rem);line-height:1;text-align:center;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+.ptsbig.pos{color:var(--green)} .ptsbig.neg{color:var(--red)}
+.ptsto{text-align:center;font-size:1.6rem;font-weight:800;margin-top:4px}
+.ansline{font-size:1.4rem;font-weight:800;color:var(--green);margin-bottom:6px}
+.sol{margin:8px 0 0;padding-left:1.4em;font-size:1.15rem;line-height:1.55}
+.subov{position:absolute;inset:0;background:rgba(3,7,20,.85);display:flex;align-items:center;justify-content:center;border-radius:18px;padding:16px}
+.subpanel{background:var(--navy2);border:3px solid var(--gold);border-radius:16px;padding:22px 26px;text-align:center;width:min(560px,100%)}
+.subpanel h2{font-family:var(--display);color:var(--gold);font-size:2.6rem;margin:0}
+.subpanel p{color:var(--muted);margin:6px 0 16px;font-size:1.05rem}
+#recipList{display:grid;gap:10px}
+.recip{border:3px solid;border-radius:12px;background:var(--navy);color:#fff;padding:12px;font-size:1.25rem;font-weight:800}
+.recip:hover{filter:brightness(1.3)}
+.big{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+#twist{background:radial-gradient(circle,#7a1f8f 0%,#2a0838 70%,#0a0212 100%)}
+#twist .kicker{font-family:var(--display);font-size:clamp(4rem,14vw,10rem);color:var(--gold);text-shadow:0 6px 0 #6b3d00,0 0 40px rgba(247,201,72,.6);animation:spinin .9s cubic-bezier(.2,1.4,.4,1)}
+#twist .cond{font-family:var(--display);font-size:clamp(2.4rem,7vw,5rem);color:#fff;margin:14px 0 6px;animation:pop .6s .7s both}
+#twist .desc{font-size:1.4rem;color:#f0d6ff;max-width:44ch;margin-bottom:28px;animation:pop .6s .9s both}
+#cleared{background:radial-gradient(circle,#1d3a9a 0%,#081133 75%)}
+#cleared .title{font-size:clamp(4rem,13vw,9rem);animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
+#winner{background:radial-gradient(circle at 50% 20%,#24409e 0%,#081133 75%);overflow:auto;justify-content:flex-start;padding-top:5vh}
+#winner .title{font-size:clamp(3rem,9vw,6rem)}
+#winNote{color:#e8c8ff;font-size:1.2rem;margin-top:12px;max-width:52ch}
+#winCond{font-family:var(--display);font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;margin:10px 0 18px}
+#standings{width:min(640px,100%);display:grid;gap:10px;margin-bottom:26px}
+.stand{display:flex;align-items:center;gap:14px;background:var(--navy2);border:3px solid var(--line);border-radius:14px;padding:10px 16px;font-size:1.4rem;font-weight:800}
+.stand .rk{font-family:var(--display);color:var(--muted);width:1.6em}
+.stand .sn{flex:1;text-align:left}
+.stand .sp{font-family:var(--display);font-size:2rem}
+.stand.win{border-color:var(--gold);background:linear-gradient(90deg,#5a4300,#122157);box-shadow:0 0 30px rgba(247,201,72,.5);animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
+#winnerName{font-family:var(--display);font-size:clamp(2.6rem,8vw,5.5rem);margin:6px 0 2px}
+#confirmEnd .subpanel{position:relative}
+@keyframes flash{50%{opacity:.35}}
+@keyframes pulse{50%{box-shadow:0 0 0 4px rgba(247,201,72,.3)}}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes spinin{from{transform:rotate(-200deg) scale(.1);opacity:0}to{transform:none;opacity:1}}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes buzzlit{50%{background:var(--gold);color:#1a1300}}
+@media (max-width:700px){.choices{grid-template-columns:1fr}.qpanel{padding:16px}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <h1 class="title">The Unfair Game</h1>
+  <svg class="arc" viewBox="0 0 520 90" aria-hidden="true">
+    <path d="M10 85 Q260 -70 510 85" fill="none" stroke="#f7c948" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round"/>
+    <circle cx="10" cy="85" r="6" fill="#f7c948"/><circle cx="260" cy="7.5" r="7" fill="#fff6dc"/>
+    <line x1="260" y1="7.5" x2="300" y2="7.5" stroke="#fff6dc" stroke-width="2"/><polygon points="300,3 308,7.5 300,12" fill="#fff6dc"/>
+  </svg>
+  <p class="sub">2D Projectiles edition. Use g = 9.8 m/s².</p>
+  <div class="panel">
+    <div class="countrow">
+      <button class="btn ghost" id="minusT" aria-label="Fewer teams">−</button>
+      <span id="teamCount">4</span><span>teams</span>
+      <button class="btn ghost" id="plusT" aria-label="More teams">+</button>
+    </div>
+    <div id="teamList"></div>
+    <p class="hint">Each team's buzz key is used on the Slot 4 showdown questions. Click a key to change it, then press the key a team's buzzer sends (or any keyboard key). If you're using a lockout box instead, ignore the keys and click the team's button on screen when they buzz.</p>
+  </div>
+  <button class="btn" id="startBtn">Start game</button>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="hidden">
+  <div class="topbar">
+    <h1 class="title">The Unfair Game</h1>
+    <div id="turnInd"></div>
+    <span id="progress"></span>
+    <button class="iconbtn" id="muteBtn" aria-label="Toggle sound">🔊 Sound on</button>
+  </div>
+  <div id="banner" class="hidden"></div>
+  <div id="board"></div>
+  <div id="scores"></div>
+  <div class="bottombar"><button class="btn danger" id="endEarly">End game early &amp; reveal winner</button></div>
+</section>
+
+<!-- ============ QUESTION ============ -->
+<div id="qModal" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="qpanel">
+    <div class="qhead"><span id="qCat"></span><span id="qTag" class="tag"></span></div>
+    <div class="qstatus"><div id="qWho"></div><div id="qTimer" class="timer"></div></div>
+    <div id="qNote" class="note"></div>
+    <div id="qText" class="qtext"></div>
+    <div id="qChoices" class="choices"></div>
+    <div id="qBuzz" class="hidden">
+      <div id="buzzTeams" class="buzzteams"></div>
+      <div id="answerRow" class="answerrow hidden">
+        <label for="ansInput" id="ansLabel"></label>
+        <input id="ansInput" inputmode="decimal" autocomplete="off" spellcheck="false">
+        <span id="ansUnits"></span>
+        <button class="btn" id="ansSubmit">Check answer</button>
+        <button class="btn ghost" id="ansCancel">Cancel buzz</button>
+      </div>
+      <div id="wrongLog" class="wronglog"></div>
+    </div>
+    <div id="qFeedback" class="feedback"></div>
+    <div id="qReveal" class="reveal hidden"></div>
+    <div id="qControls" class="controls"></div>
+    <div id="pickRecip" class="subov hidden">
+      <div class="subpanel">
+        <h2>Correct!</h2>
+        <p>Who gets the points? The value stays hidden until you choose.</p>
+        <div id="recipList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CONFIRM END ============ -->
+<div id="confirmEnd" class="overlay hidden">
+  <div class="subpanel">
+    <h2>End the game?</h2>
+    <p>This skips the rest of the board and reveals the winner now.</p>
+    <div class="controls" style="justify-content:center">
+      <button class="btn ghost" id="endNo">Keep playing</button>
+      <button class="btn danger" id="endYes">End game</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TWIST / CLEARED / WINNER ============ -->
+<div id="twist" class="big hidden">
+  <div class="kicker">PLOT TWIST!</div>
+  <div class="cond" id="twistCond"></div>
+  <div class="desc" id="twistDesc"></div>
+  <button class="btn" id="twistOk">Back to the game</button>
+</div>
+<div id="cleared" class="big hidden"><div class="title">Board cleared!</div></div>
+<div id="winner" class="big hidden">
+  <div class="title" id="winTitle">And the winner is…</div>
+  <div id="winNote"></div>
+  <div id="winCond"></div>
+  <div id="winnerName"></div>
+  <div id="standings"></div>
+  <button class="btn" id="newGame">New game</button>
+</div>
+
+<script>
+const DATA = {"categories": [{"title": "What's Your Vector, Victor?", "pools": [[{"type": "mc", "q": "Ignoring air resistance, what force(s) act on a projectile once it has been launched?", "options": ["Only gravity", "Gravity and a forward force from the launch", "Only the forward force from the launch", "No forces at all"]}, {"type": "mc", "q": "Ignoring air resistance, what happens to a projectile's horizontal velocity during its flight?", "options": ["It stays constant", "It steadily increases", "It steadily decreases", "It drops to zero at the peak"]}, {"type": "mc", "q": "Ignoring air resistance, what is a projectile's acceleration at every point in its flight?", "options": ["9.8 m/s² straight down", "Zero", "9.8 m/s² in the direction it's moving", "It depends on how fast it's moving"]}], [{"type": "mc", "q": "Why can the horizontal and vertical motions of a projectile be analyzed separately?", "options": ["Perpendicular components are independent; gravity only acts vertically", "The horizontal motion is always larger", "Air resistance cancels out gravity", "The projectile moves in a straight line"]}, {"type": "mc", "q": "A plane flying horizontally at constant speed drops a package. Ignoring air resistance, where is the plane when the package hits the ground?", "options": ["Directly above the package", "Behind the package", "Far ahead of the package", "Directly above the spot where it was released"]}, {"type": "mc", "q": "A ball's velocity has a large horizontal component and a small vertical component. Which way is the ball mostly headed?", "options": ["Mostly sideways, angled slightly up or down", "Mostly straight up", "Mostly straight down", "There's no way to tell from components"]}], [{"type": "mc", "q": "A ball is launched at 20.0 m/s at 30.0° above the horizontal. What is the horizontal component of its initial velocity?", "options": ["17.3 m/s", "10.0 m/s", "20.0 m/s", "11.5 m/s"]}, {"type": "mc", "q": "A ball is launched at 25.0 m/s at 53.0° above the horizontal. What is the vertical component of its initial velocity?", "options": ["20.0 m/s", "15.0 m/s", "25.0 m/s", "33.2 m/s"]}, {"type": "mc", "q": "At one instant a projectile has a horizontal velocity of 12.0 m/s and a vertical velocity of 5.00 m/s. What is its speed?", "options": ["13.0 m/s", "17.0 m/s", "7.00 m/s", "10.9 m/s"]}], [{"type": "open", "q": "A soccer ball is kicked from the ground at 18.0 m/s at 35.0° above the horizontal. How far horizontally has it traveled 1.50 s after the kick?", "answer": 22.11710519580278, "display": "22.1", "units": "m", "solution": ["vₓ = v cos θ = (18.0 m/s)(cos 35.0°) = 14.7 m/s", "Horizontal velocity never changes, so x = vₓ·t", "x = (14.7 m/s)(1.50 s) = 22.1 m"]}, {"type": "open", "q": "A ball is launched at 15.0 m/s at 40.0° above the horizontal. What is its speed 1.20 s after launch?", "answer": 11.684268539476012, "display": "11.7", "units": "m/s", "solution": ["vₓ = (15.0)(cos 40.0°) = 11.5 m/s (stays constant)", "v_y0 = (15.0)(sin 40.0°) = 9.64 m/s", "v_y = v_y0 − g·t = 9.64 − (9.8)(1.20) = -2.12 m/s (already coming down)", "speed = √(vₓ² + v_y²) = √(11.5² + (-2.12)²) = 11.7 m/s"]}, {"type": "open", "q": "A projectile is launched from the ground at 30.0 m/s at 60.0° above the horizontal. How high above the ground is it 2.00 s after launch?", "answer": 32.36152422706631, "display": "32.4", "units": "m", "solution": ["v_y0 = (30.0)(sin 60.0°) = 26.0 m/s", "y = v_y0·t − ½·g·t²", "y = (26.0)(2.00) − ½(9.8)(2.00)² = 52.0 − 19.6 = 32.4 m"]}]]}, {"title": "Over the Edge", "pools": [[{"type": "mc", "q": "A ball rolls off the edge of a table horizontally. What is its vertical velocity at the instant it leaves the table?", "options": ["0 m/s", "Equal to its horizontal speed", "9.8 m/s downward", "It depends on the table's height"]}, {"type": "mc", "q": "At the same instant, one ball rolls off a table horizontally at 3 m/s and another is dropped straight down from the table's edge. Which hits the floor first?", "options": ["They land at the same time", "The ball rolling off at 3 m/s", "The dropped ball", "Whichever ball is heavier"]}, {"type": "mc", "q": "For a horizontally launched projectile, the time it spends in the air depends only on…", "options": ["The height it falls from", "Its horizontal speed", "Its mass", "Both its height and its horizontal speed"]}], [{"type": "mc", "q": "A ball rolls horizontally off a cliff. If its launch speed is doubled, how does the horizontal distance to where it lands change?", "options": ["It doubles", "It quadruples", "It stays the same", "It is cut in half"]}, {"type": "mc", "q": "A marble rolls off a table. If the table were 4 times taller (same launch speed), its time in the air would…", "options": ["Double", "Quadruple", "Stay the same", "Be cut in half"]}, {"type": "mc", "q": "Ignoring air resistance, what is the shape of the path of a ball launched horizontally off a cliff?", "options": ["Half of a parabola, curving downward", "A straight diagonal line", "Straight out, then straight down like a cartoon", "Part of a circle"]}], [{"type": "mc", "q": "A pool ball leaves a 0.800 m tall table horizontally. How long does it take to hit the floor?", "options": ["0.404 s", "0.0816 s", "0.163 s", "0.286 s"]}, {"type": "mc", "q": "A ball rolls off a table at 2.50 m/s and hits the floor 0.450 s later. How far from the table's edge does it land?", "options": ["1.13 m", "5.56 m", "0.992 m", "2.25 m"]}, {"type": "mc", "q": "A stone is thrown horizontally at 12.0 m/s off a cliff and hits the ground 3.00 s later. How tall is the cliff?", "options": ["44.1 m", "36.0 m", "88.2 m", "29.4 m"]}], [{"type": "open", "q": "A pool ball leaves a 0.750 m high table with a horizontal speed of 2.80 m/s. How far from the table's edge does it land?", "answer": 1.0954451150103321, "display": "1.10", "units": "m", "solution": ["Vertical: starts at 0 m/s, falls 0.750 m → 0.750 = ½(9.8)t²", "t = √(2·0.750 / 9.8) = 0.391 s", "Horizontal: x = vₓ·t = (2.80)(0.391) = 1.10 m"]}, {"type": "open", "q": "A cliff diver runs horizontally off a 12.0 m high cliff at 3.50 m/s. How far from the base of the cliff does she hit the water?", "answer": 5.477225575051661, "display": "5.48", "units": "m", "solution": ["Vertical: 12.0 = ½(9.8)t²", "t = √(2·12.0 / 9.8) = 1.56 s", "Horizontal: x = (3.50)(1.56) = 5.48 m"]}, {"type": "open", "q": "A ball rolls off a 1.20 m high table and lands 1.80 m from the table's edge. How fast was it rolling when it left the table?", "answer": 3.637306695894643, "display": "3.64", "units": "m/s", "solution": ["Vertical: 1.20 = ½(9.8)t²", "t = √(2·1.20 / 9.8) = 0.495 s", "Horizontal: vₓ = x / t = 1.80 / 0.495 = 3.64 m/s"]}]]}, {"title": "Angle Management", "pools": [[{"type": "mc", "q": "Ignoring air resistance, what launch angle gives the greatest range on level ground?", "options": ["45°", "30°", "60°", "90°"]}, {"type": "mc", "q": "A ball is launched straight up (90°). What is its horizontal range?", "options": ["Zero", "The maximum possible", "The same as at 45°", "It depends on the launch speed"]}, {"type": "mc", "q": "Ignoring air resistance, a ball launched from level ground lands with a speed that is ___ its launch speed.", "options": ["Equal to", "Greater than", "Less than", "Exactly half of"]}], [{"type": "mc", "q": "A ball launched at 30° lands a certain distance away. At what other angle (same speed, level ground) would it land the same distance away?", "options": ["60°", "45°", "75°", "15°"]}, {"type": "mc", "q": "Two balls are launched from level ground at the same speed, one at 30° and one at 60°. Which stays in the air longer?", "options": ["The 60° ball", "The 30° ball", "They're in the air for the same time", "Whichever ball is heavier"]}, {"type": "mc", "q": "A ball is launched from level ground. If its launch speed is doubled (same angle), its range…", "options": ["Quadruples", "Doubles", "Stays the same", "Is cut in half"]}], [{"type": "mc", "q": "A ball is launched from level ground at 20.0 m/s at 45.0°. What is its horizontal range?", "options": ["40.8 m", "20.4 m", "28.9 m", "81.6 m"]}, {"type": "mc", "q": "A projectile is launched from level ground at 25.0 m/s at 30.0° above the horizontal. How long is it in the air?", "options": ["2.55 s", "1.28 s", "4.42 s", "5.10 s"]}, {"type": "mc", "q": "A golf ball is in the air for 3.00 s and lands 60.0 m away on level ground. What was the horizontal component of its launch velocity?", "options": ["20.0 m/s", "180 m/s", "14.7 m/s", "40.0 m/s"]}], [{"type": "open", "q": "A football is kicked from level ground at 22.0 m/s at 38.0° above the horizontal. What is its horizontal range?", "answer": 47.92072770587574, "display": "47.9", "units": "m", "solution": ["vₓ = (22.0)(cos 38.0°) = 17.3 m/s;  v_y0 = (22.0)(sin 38.0°) = 13.5 m/s", "Time to peak = v_y0 / g = 13.5 / 9.8 = 1.38 s, so total time = 2.76 s", "Range = vₓ·t = (17.3)(2.76) = 47.9 m"]}, {"type": "open", "q": "A cannon on level ground fires a ball at 40.0 m/s at 25.0° above the horizontal. How long is the ball in the air?", "answer": 3.449944993801628, "display": "3.45", "units": "s", "solution": ["v_y0 = (40.0)(sin 25.0°) = 16.9 m/s", "Time to peak = 16.9 / 9.8 = 1.72 s", "Up and down take equal time on level ground: total = 2 × 1.72 = 3.45 s"]}, {"type": "open", "q": "A ball is kicked from level ground at 16.0 m/s and lands 1.80 s later. At what angle above the horizontal was it kicked?", "answer": 33.452810520772545, "display": "33.5", "units": "°", "solution": ["Time to peak = half the flight = 0.900 s", "v_y0 = g·t_up = (9.8)(0.900) = 8.82 m/s", "sin θ = v_y0 / v = 8.82 / 16.0 = 0.551", "θ = sin⁻¹(0.551) = 33.5°"]}]]}, {"title": "Peak Performance", "pools": [[{"type": "mc", "q": "At the very top of its path, what is a projectile's vertical velocity?", "options": ["Zero", "Its maximum value", "9.8 m/s", "Equal to its horizontal velocity"]}, {"type": "mc", "q": "A ball is launched from and lands on level ground. Compared to its time going up, its time coming down is…", "options": ["Equal", "Longer", "Shorter", "Longer or shorter depending on the angle"]}, {"type": "mc", "q": "Where in its flight does a projectile launched at an upward angle have its slowest speed?", "options": ["At the peak", "Right at launch", "Right before landing", "Its speed never changes"]}], [{"type": "mc", "q": "At the peak of its path, a projectile's speed is equal to…", "options": ["Its horizontal velocity component", "Zero", "Its launch speed", "Its vertical velocity component at launch"]}, {"type": "mc", "q": "Two balls are launched with the same vertical velocity component but different horizontal components. Which one reaches a higher peak?", "options": ["They reach the same height", "The one with the larger horizontal component", "The one with the smaller horizontal component", "You can't tell without the angles"]}, {"type": "mc", "q": "If a projectile's vertical launch velocity is doubled, its maximum height…", "options": ["Quadruples", "Doubles", "Stays the same", "Increases by about 41%"]}], [{"type": "mc", "q": "A ball is launched with a vertical velocity component of 14.7 m/s. How long does it take to reach the top of its path?", "options": ["1.50 s", "3.00 s", "0.667 s", "1.22 s"]}, {"type": "mc", "q": "A ball is launched with a vertical velocity component of 9.80 m/s. How high above its launch point does it rise?", "options": ["4.90 m", "9.80 m", "1.00 m", "2.45 m"]}, {"type": "mc", "q": "A ball is launched at 30.0 m/s at 30.0° above the horizontal. What is its maximum height above the launch point?", "options": ["11.5 m", "34.4 m", "45.9 m", "23.0 m"]}], [{"type": "open", "q": "A volleyball is served at 12.0 m/s at 55.0° above the horizontal. How high above the launch point is the top of its path?", "answer": 4.929869914257559, "display": "4.93", "units": "m", "solution": ["v_y0 = (12.0)(sin 55.0°) = 9.83 m/s", "At the peak v_y = 0, so v_y0² = 2·g·h", "h = v_y0² / (2g) = (9.83)² / 19.6 = 4.93 m"]}, {"type": "open", "q": "A ball is launched at 26.0 m/s at 62.0° above the horizontal. How far horizontally from the launch point is it when it reaches the top of its path?", "answer": 28.59333668608205, "display": "28.6", "units": "m", "solution": ["vₓ = (26.0)(cos 62.0°) = 12.2 m/s;  v_y0 = (26.0)(sin 62.0°) = 23.0 m/s", "Time to peak = v_y0 / g = 23.0 / 9.8 = 2.34 s", "x = vₓ·t = (12.2)(2.34) = 28.6 m"]}, {"type": "open", "q": "A projectile reaches a maximum height of 15.0 m above its launch point, and its horizontal velocity is 8.00 m/s. What was its launch speed?", "answer": 18.920887928424502, "display": "18.9", "units": "m/s", "solution": ["At the peak v_y = 0, so v_y0 = √(2·g·h)", "v_y0 = √(2·9.8·15.0) = 17.1 m/s", "Launch speed = √(vₓ² + v_y0²) = √(8.00² + 17.1²) = 18.9 m/s"]}]]}, {"title": "Hang Time", "pools": [[{"type": "mc", "q": "Ignoring air resistance, does a heavier ball launched exactly the same way stay in the air longer than a lighter one?", "options": ["No, mass doesn't affect a projectile's motion", "Yes, the heavier ball stays up longer", "No, the heavier ball lands sooner", "Yes, the lighter ball stays up longer"]}, {"type": "mc", "q": "A ball is launched at an angle from level ground. What determines how long it stays in the air?", "options": ["Its initial vertical velocity", "Its initial horizontal velocity", "Its mass", "How far it travels"]}, {"type": "mc", "q": "Which quantity is always the same for the horizontal and vertical parts of a projectile's motion?", "options": ["Time", "Velocity", "Acceleration", "Displacement"]}], [{"type": "mc", "q": "A ball is thrown at an angle from the top of a cliff. Compared to the same throw from level ground, its time in the air is…", "options": ["Longer", "The same", "Shorter", "Longer or shorter depending on the angle"]}, {"type": "mc", "q": "A hunter aims a dart gun directly at a monkey hanging from a branch. The instant the gun fires, the monkey lets go. Ignoring air resistance, the dart…", "options": ["Hits the monkey", "Passes above the monkey", "Passes below the monkey", "Hits only if the dart is very fast"]}, {"type": "mc", "q": "For a ball launched from and landing on level ground, how does its vertical velocity at landing compare to its vertical velocity at launch?", "options": ["Same size, opposite direction", "Same size, same direction", "It is zero at landing", "Larger at landing"]}], [{"type": "mc", "q": "A ball is launched from level ground with a vertical velocity component of 24.5 m/s. How long is it in the air?", "options": ["5.00 s", "2.50 s", "2.24 s", "10.0 s"]}, {"type": "mc", "q": "A ball launched from level ground is in the air for 4.00 s. What is its maximum height?", "options": ["19.6 m", "78.4 m", "39.2 m", "9.80 m"]}, {"type": "mc", "q": "A rock is thrown horizontally at 8.00 m/s off a bridge 19.6 m above the water. How long is it in the air?", "options": ["2.00 s", "2.45 s", "4.00 s", "1.41 s"]}], [{"type": "open", "q": "A ball is thrown from the top of a 20.0 m cliff at 15.0 m/s, 30.0° above the horizontal. How long until it hits the ground below?", "answer": 2.925705648953074, "display": "2.93", "units": "s", "solution": ["v_y0 = (15.0)(sin 30.0°) = 7.50 m/s (up is +)", "y = v_y0·t − ½gt² with y = −20.0 m:  −20.0 = 7.50t − 4.9t²", "4.9t² − 7.50t − 20.0 = 0 → quadratic formula", "t = [7.50 + √(7.50² + 4·4.9·20.0)] / 9.8 = 2.93 s (take the positive root)"]}, {"type": "open", "q": "A stone is thrown from the top of a 15.0 m cliff at 12.0 m/s, 25.0° above the horizontal. How far from the base of the cliff does it land?", "answer": 25.471445814508193, "display": "25.5", "units": "m", "solution": ["vₓ = (12.0)(cos 25.0°) = 10.9 m/s;  v_y0 = (12.0)(sin 25.0°) = 5.07 m/s", "−15.0 = 5.07t − 4.9t²  →  4.9t² − 5.07t − 15.0 = 0", "Positive root: t = 2.34 s", "x = vₓ·t = (10.9)(2.34) = 25.5 m"]}, {"type": "open", "q": "A basketball leaves a player's hands 2.00 m above the floor at 9.00 m/s, 52.0° above the horizontal. If it misses everything, how long until it hits the floor?", "answer": 1.689023103654922, "display": "1.69", "units": "s", "solution": ["v_y0 = (9.00)(sin 52.0°) = 7.09 m/s", "−2.00 = 7.09t − 4.9t²  →  4.9t² − 7.09t − 2.00 = 0", "t = [7.09 + √(7.09² + 4·4.9·2.00)] / 9.8 = 1.69 s"]}]]}]};
+
+const SLOT_RANGES = [[3,5],[5,8],[8,10],[15,25]];
+const FIRST_TIME = [20,20,60];
+const STEAL_TIME = 10, READ_TIME = 5, GRACE_TIME = 2, TOLERANCE = 0.05;
+const COLORS = ['#ff6b6b','#4dabf7','#51cf66','#fcc419','#cc5de8','#ff922b','#20c997'];
+const CONDS = {
+  highest:{title:'Highest score wins', desc:'Pile up the points. Most points takes the crown.'},
+  lowest:{title:'Lowest score wins', desc:'Points are poison now. Fewest points takes the crown.'},
+  zero:{title:'Closest to zero wins', desc:'Too high or too low both lose. Whoever is nearest to zero takes the crown.'}
+};
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const randInt = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+const fmtV = v => v>0 ? '+'+v : '−'+Math.abs(v);
+const unitStr = u => u==='°' ? '°' : ' '+u;
+const normKey = k => k.length===1 ? k.toLowerCase() : k;
+const keyLabel = k => k===' ' ? 'Space' : (k.length===1 ? k.toUpperCase() : k);
+
+/* ---------- sound ---------- */
+let AC=null, muted=false;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } } if(AC&&AC.state==='suspended') AC.resume(); return AC; }
+function tone(f,dur,type='sine',vol=.15,when=0){ if(muted) return; const a=ac(); if(!a) return; const t0=a.currentTime+when; const o=a.createOscillator(), gn=a.createGain(); o.type=type; o.frequency.setValueAtTime(f,t0); gn.gain.setValueAtTime(vol,t0); gn.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(gn); gn.connect(a.destination); o.start(t0); o.stop(t0+dur+.05); }
+const sfx = {
+  buzz(){ tone(140,.55,'sawtooth',.22); tone(147,.55,'square',.1); },
+  correct(){ tone(660,.15,'triangle',.2); tone(880,.3,'triangle',.2,.15); },
+  wrong(){ tone(220,.3,'square',.12); tone(150,.45,'square',.12,.2); },
+  tick(){ tone(1100,.05,'square',.05); },
+  time(){ tone(400,.25,'sawtooth',.15); tone(300,.4,'sawtooth',.15,.2); },
+  plus(){ [523,659,784,1047].forEach((f,i)=>tone(f,.18,'triangle',.16,i*.09)); },
+  minus(){ [523,440,349,262].forEach((f,i)=>tone(f,.2,'triangle',.16,i*.1)); },
+  twist(){ [196,247,294,392,494,587].forEach((f,i)=>tone(f,.35,'sawtooth',.09,i*.12)); },
+  fanfare(){ [523,523,523,659,784,659,784,1047].forEach((f,i)=>tone(f,.22,'triangle',.18,i*.14)); },
+  spin(){ tone(900,.03,'square',.04); }
+};
+
+/* ---------- setup ---------- */
+let teamCount = 4;
+const setupTeams = COLORS.map((c,i)=>({name:'Team '+(i+1), key:String(i+1)}));
+let keyCapture = null;
+
+function renderSetup(){
+  $('#teamCount').textContent = teamCount;
+  const list = $('#teamList'); list.innerHTML='';
+  for(let i=0;i<teamCount;i++){
+    const t = setupTeams[i];
+    const row = document.createElement('div'); row.className='trow';
+    row.innerHTML = `<span class="swatch" style="background:${COLORS[i]}"></span>
+      <input aria-label="Team ${i+1} name" value="${esc(t.name)}" maxlength="24">
+      <button class="keybtn ${keyCapture===i?'capturing':''}">${keyCapture===i?'Press a key…':'Buzz key'}<kbd>${esc(keyLabel(t.key))}</kbd></button>`;
+    row.querySelector('input').addEventListener('input', e => t.name = e.target.value);
+    row.querySelector('.keybtn').addEventListener('click', () => { keyCapture = keyCapture===i ? null : i; renderSetup(); });
+    list.appendChild(row);
+  }
+}
+$('#minusT').onclick = () => { if(teamCount>2){ teamCount--; keyCapture=null; renderSetup(); } };
+$('#plusT').onclick  = () => { if(teamCount<7){ teamCount++; keyCapture=null; renderSetup(); } };
+
+/* ---------- game state ---------- */
+let S = null;   // game
+let Q = null;   // open question
+let timerH = null;
+
+function prepQ(q){
+  if(q.type!=='mc') return {...q};
+  const order = shuffle([0,1,2,3]);
+  return {...q, options: order.map(i=>q.options[i]), correct: order.indexOf(0)};
+}
+function randVal(si){ const [lo,hi]=SLOT_RANGES[si]; const m=randInt(lo,hi); return Math.random()<.5 ? -m : m; }
+
+function startGame(){
+  ac();
+  keyCapture = null;
+  const teams = setupTeams.slice(0,teamCount).map((t,i)=>({name:(t.name.trim()||'Team '+(i+1)), key:t.key, color:COLORS[i], score:0}));
+  const board = DATA.categories.map(cat=>({
+    title:cat.title,
+    cells: cat.pools.map((pool,si)=>({slot:si, q:prepQ(pick(pool)), value:randVal(si), done:false, result:null}))
+  }));
+  const total = board.length*4;
+  S = { teams, board, total, answered:0, turn:randInt(0,teams.length-1),
+        cond: pick(Object.keys(CONDS)), twistAt: randInt(Math.ceil(total*.35), Math.floor(total*.65)), twistShown:false, over:false };
+  $('#setup').classList.add('hidden'); $('#game').classList.remove('hidden');
+  renderGame();
+}
+$('#startBtn').onclick = startGame;
+
+/* ---------- board render ---------- */
+function teamTag(i){ const t=S.teams[i]; return `<span style="color:${t.color}">${esc(t.name)}</span>`; }
+
+function renderGame(){
+  const b = $('#board'); b.innerHTML=''; b.style.setProperty('--cols', S.board.length);
+  S.board.forEach(c=>{ const d=document.createElement('div'); d.className='cat'; d.textContent=c.title; b.appendChild(d); });
+  for(let si=0;si<4;si++){
+    S.board.forEach((c,ci)=>{
+      const cell=c.cells[si]; const btn=document.createElement('button');
+      btn.className='cell'+(si===3?' s4':'')+(cell.done?' done':'');
+      if(cell.done){
+        const r=cell.result, t=S.teams[r.to];
+        btn.innerHTML=`<span class="dv ${r.v>0?'pos':'neg'}">${fmtV(r.v)}</span><span class="dt" style="background:${t.color}">${esc(t.name)}</span>`;
+        btn.disabled=true; btn.setAttribute('aria-label',`${c.title} slot ${si+1}, done`);
+      } else {
+        btn.innerHTML = si===3 ? `4<span class="tag4">🔔 SHOWDOWN</span>` : String(si+1);
+        btn.setAttribute('aria-label',`${c.title}, question ${si+1}`);
+        btn.onclick=()=>openQuestion(ci,si);
+      }
+      b.appendChild(btn);
+    });
+  }
+  const sc=$('#scores'); sc.innerHTML='';
+  S.teams.forEach((t,i)=>{
+    const d=document.createElement('div'); d.className='score'+(i===S.turn&&!S.over?' turn':''); d.style.borderColor=t.color;
+    d.innerHTML=`<div class="nm" style="color:${t.color}">${esc(t.name)}</div><div class="pt">${t.score}</div>`;
+    sc.appendChild(d);
+  });
+  $('#turnInd').innerHTML = `<b>${teamTag(S.turn)}</b> picks the next question`;
+  $('#progress').textContent = `${S.answered} of ${S.total} done`;
+  const bn=$('#banner');
+  if(S.twistShown){ bn.classList.remove('hidden'); bn.textContent='🌀 '+CONDS[S.cond].title+' 🌀'; } else bn.classList.add('hidden');
+}
+
+/* ---------- timers ---------- */
+function clearTimer(){ if(timerH){ clearInterval(timerH); timerH=null; } }
+function countdown(secs, onUpdate, onEnd){
+  clearTimer(); const end=Date.now()+secs*1000; let last=null;
+  const step=()=>{ const rem=Math.max(0,(end-Date.now())/1000); const s=Math.ceil(rem);
+    if(s!==last){ onUpdate(s,rem); last=s; } if(rem<=0){ clearTimer(); onEnd(); } };
+  step(); if(timerH===null && Date.now()<end) timerH=setInterval(step,100);
+}
+function setTimer(text, cls){ const t=$('#qTimer'); t.className='timer'+(cls?' '+cls:''); t.textContent=text; }
+
+/* ---------- question open ---------- */
+function openQuestion(ci,si){
+  const cell=S.board[ci].cells[si]; if(cell.done||Q) return;
+  ac();
+  Q = {ci,si,cell,q:cell.q, phase:'read', team:S.turn, attempted:new Set(), elim:new Set(), locked:new Set(), buzzer:null, wrongs:[]};
+  $('#qCat').textContent = `${S.board[ci].title}: ${si+1}`;
+  const tag=$('#qTag');
+  if(si===3){ tag.className='tag show'; tag.textContent='🔔 Showdown: any team can buzz'; }
+  else if(si===2){ tag.className='tag calc'; tag.textContent='🧮 Calculation: 60 s'; }
+  else { tag.className='tag'; tag.textContent='Conceptual: 20 s'; }
+  $('#qText').textContent = cell.q.q;
+  $('#qFeedback').innerHTML=''; $('#qReveal').classList.add('hidden'); $('#qReveal').innerHTML='';
+  $('#pickRecip').classList.add('hidden');
+  $('#qModal').classList.remove('hidden');
+  if(cell.q.type==='mc') openMC(); else openShowdown();
+}
+
+function readAloud(then){
+  Q.phase='read';
+  countdown(READ_TIME, s=>setTimer(s,'reading'), then);
+}
+
+/* ---------- multiple choice ---------- */
+function openMC(){
+  $('#qBuzz').classList.add('hidden'); $('#qChoices').classList.remove('hidden');
+  $('#qNote').textContent = Q.si===2 ? 'Calculation question, so the first attempt gets 60 seconds. Use g = 9.8 m/s². Steals get 10 seconds.' : 'Read it aloud; the 20-second clock starts automatically. Steals get 10 seconds.';
+  const box=$('#qChoices'); box.innerHTML='';
+  Q.q.options.forEach((o,i)=>{
+    const b=document.createElement('button'); b.className='choice';
+    b.innerHTML=`<span class="lt">${'ABCD'[i]}</span><span>${esc(o)}</span>`;
+    b.onclick=()=>choose(i); box.appendChild(b);
+  });
+  $('#qWho').innerHTML = `Read aloud for ${teamTag(Q.team)}`;
+  renderControls();
+  readAloud(()=>startAttempt(Q.team, FIRST_TIME[Q.si], false));
+}
+
+function choiceBtns(){ return [...$('#qChoices').children]; }
+function setChoicesEnabled(on){ choiceBtns().forEach((b,i)=>{ b.disabled = !on || Q.elim.has(i); }); }
+
+function startAttempt(team, secs, isSteal){
+  Q.team=team; Q.phase='timing'; Q.isSteal=isSteal;
+  $('#qWho').innerHTML = isSteal ? `🏴‍☠️ Steal: ${teamTag(team)}` : `${teamTag(team)} is answering`;
+  setChoicesEnabled(true); renderControls();
+  countdown(secs, (s,rem)=>{ setTimer(s, rem<=5?'danger':''); if(s<=5&&s>0) sfx.tick(); }, ()=>{
+    Q.phase='grace'; sfx.time();
+    setTimer('TIME!','grace');
+    $('#qFeedback').innerHTML='<span class="bad">Time! Click the answer if they blurted it out at the buzzer…</span>';
+    countdown(GRACE_TIME, ()=>{}, ()=>{ $('#qFeedback').innerHTML=''; wrongMC(null); });
+  });
+}
+
+function choose(i){
+  if(!Q || !['read','timing','grace'].includes(Q.phase) || Q.elim.has(i)) return;
+  clearTimer();
+  const btn=choiceBtns()[i];
+  if(i===Q.q.correct){
+    btn.classList.add('correct'); setChoicesEnabled(false); sfx.correct();
+    $('#qFeedback').innerHTML=`<span class="ok">✓ Correct! ${teamTag(Q.team)} got it.</span>`;
+    setTimer('✓','idle'); Q.phase='pick'; renderControls();
+    setTimeout(()=>showRecipPicker(Q.team), 700);
+  } else {
+    Q.elim.add(i); btn.classList.add('wrong'); wrongMC(i);
+  }
+}
+
+function nextTeam(from, excluded){
+  const n=S.teams.length;
+  for(let k=1;k<n;k++){ const t=(from+k)%n; if(!excluded.has(t)) return t; }
+  return null;
+}
+
+function wrongMC(i){
+  Q.attempted.add(Q.team); setChoicesEnabled(false); sfx.wrong();
+  $('#qFeedback').innerHTML = i===null
+    ? `<span class="bad">⏱ Out of time: ${teamTag(Q.team)} is out.</span>`
+    : `<span class="bad">✗ Not it: ${teamTag(Q.team)} is out.</span>`;
+  const nxt=nextTeam(Q.team, Q.attempted);
+  if(nxt===null){ noOneGotIt(); return; }
+  Q.phase='steal'; Q.next=nxt; setTimer('—','idle');
+  $('#qWho').innerHTML = `Up to steal: ${teamTag(nxt)}`;
+  renderControls();
+}
+
+/* ---------- showdown ---------- */
+function openShowdown(){
+  $('#qChoices').classList.add('hidden'); $('#qBuzz').classList.remove('hidden');
+  $('#answerRow').classList.add('hidden'); $('#wrongLog').textContent='';
+  $('#qNote').textContent = `No time limit. Use g = 9.8 m/s². Answers within ±5% count. Answer in ${Q.q.units==='°'?'degrees':Q.q.units}.`;
+  $('#qWho').innerHTML = 'Read it aloud. Buzzers open in…';
+  renderBuzzTeams(); renderControls();
+  readAloud(openBuzzers);
+}
+function openBuzzers(){
+  Q.phase='buzzOpen'; Q.buzzer=null;
+  setTimer('BUZZ!','open');
+  $('#qWho').innerHTML = 'Buzzers are open! First team to buzz answers.';
+  $('#answerRow').classList.add('hidden');
+  renderBuzzTeams(); renderControls();
+}
+function renderBuzzTeams(){
+  const box=$('#buzzTeams'); box.innerHTML='';
+  S.teams.forEach((t,i)=>{
+    const b=document.createElement('button');
+    b.className='bchip'+(Q.locked.has(i)?' locked':'')+(Q.buzzer===i?' lit':'');
+    b.style.borderColor=t.color; if(Q.buzzer===i){ b.style.background=t.color; b.style.color='#0a1433'; }
+    b.innerHTML=`${esc(t.name)} <kbd>${esc(keyLabel(t.key))}</kbd>`;
+    b.disabled = Q.phase!=='buzzOpen' || Q.locked.has(i);
+    b.onclick=()=>buzz(i); box.appendChild(b);
+  });
+}
+function buzz(t){
+  if(!Q || Q.phase!=='buzzOpen' || Q.locked.has(t)) return;
+  Q.phase='buzzed'; Q.buzzer=t; sfx.buzz(); $('#qFeedback').innerHTML='';
+  setTimer('🔔','open');
+  $('#qWho').innerHTML = `🔔 ${teamTag(t)} buzzed in!`;
+  $('#ansLabel').innerHTML = `${teamTag(t)}'s answer:`;
+  $('#ansUnits').textContent = Q.q.units;
+  const inp=$('#ansInput'); inp.value='';
+  $('#answerRow').classList.remove('hidden');
+  renderBuzzTeams(); renderControls();
+  setTimeout(()=>inp.focus(),30);
+}
+function cancelBuzz(){ if(Q && Q.phase==='buzzed') openBuzzers(); }
+function submitAnswer(){
+  if(!Q || Q.phase!=='buzzed') return;
+  const inp=$('#ansInput'); const raw=inp.value.replace(/,/g,'').replace(/[^\d.eE+\-−]/g,'').replace('−','-');
+  const v=parseFloat(raw);
+  if(!isFinite(v)){ inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); return; }
+  const key=Q.q.answer, t=Q.buzzer, shown=raw+unitStr(Q.q.units);
+  $('#answerRow').classList.add('hidden');
+  if(Math.abs(v-key) <= TOLERANCE*Math.abs(key)){
+    Q.phase='pick'; sfx.correct(); setTimer('✓','idle');
+    $('#qFeedback').innerHTML=`<span class="ok">✓ ${teamTag(t)} said ${esc(shown)}. Correct!</span>`;
+    renderBuzzTeams(); renderControls();
+    setTimeout(()=>showRecipPicker(t), 700);
+  } else {
+    Q.locked.add(t); Q.wrongs.push(`${S.teams[t].name}: ${shown}`); sfx.wrong();
+    $('#wrongLog').textContent = '✗ Wrong so far: ' + Q.wrongs.join('   •   ');
+    $('#qFeedback').innerHTML=`<span class="bad">✗ ${teamTag(t)} is locked out.</span>`;
+    if(Q.locked.size>=S.teams.length) noOneGotIt(); else openBuzzers();
+  }
+}
+$('#ansSubmit').onclick=submitAnswer;
+$('#ansCancel').onclick=cancelBuzz;
+
+/* ---------- shared endings ---------- */
+function solutionHTML(){
+  const q=Q.q;
+  if(q.type==='mc') return `<div class="ansline">Answer: ${esc(q.options[q.correct])}</div>`;
+  return `<div class="ansline">Answer: ${esc(q.display)}${esc(unitStr(q.units))}</div><ol class="sol">${q.solution.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`;
+}
+
+function noOneGotIt(){
+  clearTimer(); Q.phase='spinning';
+  if(Q.q.type==='mc'){ setChoicesEnabled(false); choiceBtns()[Q.q.correct].classList.add('reveal'); }
+  else { $('#answerRow').classList.add('hidden'); renderBuzzTeams(); }
+  setTimer('—','idle');
+  $('#qWho').innerHTML='Nobody got it.';
+  const rv=$('#qReveal'); rv.classList.remove('hidden'); rv.innerHTML=solutionHTML();
+  const target=randInt(0,S.teams.length-1); let k=0; const spins=14+randInt(0,S.teams.length);
+  renderControls();
+  const spin=()=>{
+    const idx = k<spins ? (target+k-spins+S.teams.length*20)%S.teams.length : target;
+    $('#qFeedback').innerHTML=`🎲 The points go to a random team… ${teamTag(idx)}`;
+    if(k<spins){ sfx.spin(); k++; setTimeout(spin, 60+k*12); }
+    else { Q.recip=target; Q.phase='noone'; $('#qFeedback').innerHTML=`🎲 The points go to a random team: <b>${teamTag(target)}</b>`; renderControls(); }
+  };
+  spin();
+}
+
+function showRecipPicker(keeper){
+  const list=$('#recipList'); list.innerHTML='';
+  const order=[keeper, ...S.teams.map((_,i)=>i).filter(i=>i!==keeper)];
+  order.forEach(i=>{
+    const t=S.teams[i]; const b=document.createElement('button'); b.className='recip';
+    b.style.borderColor=t.color; b.innerHTML=`<span style="color:${t.color}">${esc(t.name)}</span>${i===keeper?' (keep)':''}`;
+    b.onclick=()=>{ $('#pickRecip').classList.add('hidden'); award(i); };
+    list.appendChild(b);
+  });
+  $('#pickRecip').classList.remove('hidden');
+  list.firstChild.focus();
+}
+
+function award(to){
+  clearTimer();
+  const v=Q.cell.value; S.teams[to].score+=v; Q.cell.result={v,to}; Q.phase='result';
+  v>0 ? sfx.plus() : sfx.minus();
+  const rv=$('#qReveal'); rv.classList.remove('hidden');
+  const already = rv.innerHTML;
+  rv.innerHTML = `<div class="ptsbig ${v>0?'pos':'neg'}">${fmtV(v)}</div><div class="ptsto">→ ${teamTag(to)}</div>` +
+    (already ? `<hr style="border-color:#2d4596;margin:14px 0">${already}` : (Q.q.type==='open' ? `<hr style="border-color:#2d4596;margin:14px 0">${solutionHTML()}` : ''));
+  renderControls();
+}
+
+function renderControls(){
+  const c=$('#qControls'); c.innerHTML='';
+  const add=(label,cls,fn)=>{ const b=document.createElement('button'); b.className='btn '+cls; b.textContent=label; b.onclick=fn; c.appendChild(b); return b; };
+  const p=Q.phase;
+  if(p==='steal'){
+    add('Stop: no one got it','ghost',noOneGotIt);
+    add(`Steal: ${S.teams[Q.next].name} (10 s)`,'',()=>startAttempt(Q.next, STEAL_TIME, true)).focus();
+  } else if(Q.q.type==='mc' && (p==='timing'||p==='grace') && Q.attempted.size>0){
+    add('Stop: no one got it','ghost',noOneGotIt);
+  } else if(Q.q.type==='open' && (p==='buzzOpen'||p==='buzzed')){
+    add('Stop: no one got it','ghost',noOneGotIt);
+  } else if(p==='noone'){
+    add('Reveal points','',()=>award(Q.recip)).focus();
+  } else if(p==='result'){
+    add('Back to board','',closeQuestion).focus();
+  }
+}
+
+function closeQuestion(){
+  clearTimer();
+  Q.cell.done=true; S.answered++; S.turn=(S.turn+1)%S.teams.length;
+  $('#qModal').classList.add('hidden'); Q=null;
+  renderGame(); afterQuestion();
+}
+
+/* ---------- twist & endgame ---------- */
+function afterQuestion(){
+  const done = S.answered>=S.total;
+  if(!S.twistShown && S.answered>=S.twistAt) showTwist(()=>{ if(done) boardCleared(); });
+  else if(done) boardCleared();
+}
+function showTwist(after){
+  S.twistShown=true;
+  $('#twistCond').textContent=CONDS[S.cond].title;
+  $('#twistDesc').textContent=CONDS[S.cond].desc;
+  $('#twist').classList.remove('hidden'); sfx.twist();
+  $('#twistOk').onclick=()=>{ $('#twist').classList.add('hidden'); renderGame(); if(after) after(); };
+  setTimeout(()=>$('#twistOk').focus(),50);
+}
+function boardCleared(){
+  S.over=true; renderGame();
+  $('#cleared').classList.remove('hidden'); sfx.fanfare();
+  setTimeout(()=>{ $('#cleared').classList.add('hidden'); showWinner(false); }, 2600);
+}
+function showWinner(early){
+  S.over=true; renderGame();
+  const metric = { highest:t=>-t.score, lowest:t=>t.score, zero:t=>Math.abs(t.score) }[S.cond];
+  const ranked = S.teams.map((t,i)=>({...t,i})).sort((a,b)=>metric(a)-metric(b));
+  const best = metric(ranked[0]);
+  const winners = ranked.filter(t=>metric(t)===best);
+  let note = early ? 'The host ended the game early. ' : '';
+  if(!S.twistShown) note += 'The twist never got revealed in time… but the secret rule was locked in from the start:';
+  $('#winNote').textContent = note;
+  $('#winCond').textContent = '🌀 '+CONDS[S.cond].title+' 🌀';
+  $('#winnerName').innerHTML = (winners.length>1?'Tie! ':'👑 ') + winners.map(w=>`<span style="color:${w.color}">${esc(w.name)}</span>`).join(' &amp; ');
+  const st=$('#standings'); st.innerHTML='';
+  ranked.forEach((t,r)=>{
+    const d=document.createElement('div'); const win=metric(t)===best;
+    d.className='stand'+(win?' win':''); d.style.borderColor = win ? '' : t.color;
+    d.innerHTML=`<span class="rk">${win?'👑':r+1}</span><span class="sn" style="color:${t.color}">${esc(t.name)}</span><span class="sp">${t.score}</span>`;
+    st.appendChild(d);
+  });
+  $('#winner').classList.remove('hidden'); sfx.fanfare();
+}
+$('#endEarly').onclick=()=>{ $('#confirmEnd').classList.remove('hidden'); $('#endNo').focus(); };
+$('#endNo').onclick=()=>$('#confirmEnd').classList.add('hidden');
+$('#endYes').onclick=()=>{ $('#confirmEnd').classList.add('hidden'); showWinner(true); };
+$('#newGame').onclick=()=>{
+  $('#winner').classList.add('hidden'); $('#game').classList.add('hidden'); $('#setup').classList.remove('hidden');
+  S=null; Q=null; clearTimer(); renderSetup();
+};
+$('#muteBtn').onclick=()=>{ muted=!muted; $('#muteBtn').textContent = muted ? '🔇 Sound off' : '🔊 Sound on'; };
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', e=>{
+  if(keyCapture!==null){
+    e.preventDefault();
+    if(e.key==='Escape'){ keyCapture=null; renderSetup(); return; }
+    if(['Shift','Control','Alt','Meta','Tab'].includes(e.key)) return;
+    const k=normKey(e.key), old=setupTeams[keyCapture].key;
+    for(let i=0;i<teamCount;i++) if(i!==keyCapture && setupTeams[i].key===k) setupTeams[i].key=old;
+    setupTeams[keyCapture].key=k; keyCapture=null; renderSetup(); return;
+  }
+  if(!Q || Q.q.type!=='open' || e.repeat) return;
+  if(e.target && e.target.id==='ansInput'){
+    if(e.key==='Enter'){ e.preventDefault(); submitAnswer(); }
+    else if(e.key==='Escape'){ e.preventDefault(); cancelBuzz(); }
+    return;
+  }
+  if(e.target && e.target.tagName==='INPUT') return;
+  if(Q.phase!=='buzzOpen') return;
+  const k=normKey(e.key); const t=S.teams.findIndex(tm=>tm.key===k);
+  if(t>=0){ e.preventDefault(); buzz(t); }
+});
+
+renderSetup();
+</script>
+</body>
+</html>
